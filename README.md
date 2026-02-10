@@ -50,11 +50,7 @@ We primarily report combinations: **GA+GDR**, **GA+KLR**, **NPO+GDR**, and **NPO
 
 ### Requirements (placeholders)
 
-Install dependencies with your preferred environment manager. Typical requirements include:
-
-- `torch` (CUDA-enabled)
-- `peft`
-- `bitsandbytes`
+Install dependencies with your preferred environment manager.
 
 Refer to `requirements.txt` for a minimal set of packages used in this repository.
 
