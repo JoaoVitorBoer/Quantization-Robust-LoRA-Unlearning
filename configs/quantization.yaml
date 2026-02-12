@@ -1,7 +1,0 @@
-# @package _global_
-
-# Set `quantization_config` to one of: null, "4bit", "8bit", "qlora"
-quantization_config: null
-
-model:
-  quantization_config: ${quantization_config}

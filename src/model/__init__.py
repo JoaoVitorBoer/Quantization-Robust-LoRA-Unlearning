@@ -1,22 +1,28 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from omegaconf import DictConfig, open_dict
 from typing import Dict, Any
 import os
 import torch
 import logging
 from model.probe import ProbedLlamaForCausalLM
-from model.lora import LoRAModelForCausalLM, get_lora_model
+from model.lora import LoRAModelForCausalLM
 from model.eval_lora import LoRAModelForEvaluation
+from quantization.quantizers import BitsAndBytes, GPTQ
 
 hf_home = os.getenv("HF_HOME", default=None)
 
 logger = logging.getLogger(__name__)
 
 MODEL_REGISTRY: Dict[str, Any] = {}
+QUANT_REGISTRY: Dict[str, Any] = {}
 
 
 def _register_model(model_class):
     MODEL_REGISTRY[model_class.__name__] = model_class
+
+
+def _register_quantization_method(quant_method_class):
+    QUANT_REGISTRY[quant_method_class.__name__] = quant_method_class
 
 
 def get_dtype(model_args):
@@ -45,44 +51,24 @@ def get_model(model_cfg: DictConfig):
         "Model config not found or model_args absent in configs/model."
     )
 
-    use_lora = model_cfg.get("use_lora", False)
-    quantization_config = model_cfg.get("quantization_config", None)
-    if quantization_config == "qlora" and not use_lora:
-        raise ValueError(
-            "quantization_config 'qlora' requires use_lora=True (set adapter=lora or model.use_lora=true)."
-        )
-    if use_lora:
-        return get_lora_model(model_cfg)
-    
     model_args = model_cfg.model_args
     tokenizer_args = model_cfg.tokenizer_args
     torch_dtype = get_dtype(model_args)
     model_handler = model_cfg.get("model_handler", "AutoModelForCausalLM")
     model_cls = MODEL_REGISTRY[model_handler]
+
     with open_dict(model_args):
         model_path = model_args.pop("pretrained_model_name_or_path", None)
     try:
-        bnb_config = None
-        if quantization_config == "4bit":
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-            )
-        elif quantization_config == "8bit":
-            bnb_config = BitsAndBytesConfig(
-                load_in_8bit=True,
-            )
-        elif quantization_config is not None:
-            logger.warning(
-                f"Unknown quantization_config '{quantization_config}', loading without quantization."
-            )
-        logger.info(f"\x1b[32mLoading model {model_path} with quantization config: {bnb_config}\x1b[0m")
         model = model_cls.from_pretrained(
             pretrained_model_name_or_path=model_path,
             torch_dtype=torch_dtype,
             **model_args,
             cache_dir=hf_home,
-            quantization_config=bnb_config
+            quantization_config=get_quantization_config(model_cfg), # Optinal
+            lora_config=model_cfg.get("lora_config", None), # Optional
         )
+
     except Exception as e:
         logger.warning(f"Model {model_path} requested with {model_cfg.model_args}")
         raise ValueError(
@@ -129,8 +115,22 @@ def get_tokenizer(tokenizer_cfg: DictConfig):
     return tokenizer
 
 
+def get_quantization_config(model_cfg: DictConfig):
+    quant_handler = model_cfg.get("quantization_handler", None)
+    if quant_handler is not None:
+        quant_cls = QUANT_REGISTRY[quant_handler]
+        logger.info(
+            f"\x1b[32mLoading model with quantization config: {quant_cls}\x1b[0m"
+        )
+        quant_config = model_cfg.get("quantization_config", None)
+        return quant_cls.from_config(**quant_config)
+    return None
+
+
 # register models
 _register_model(AutoModelForCausalLM)
 _register_model(ProbedLlamaForCausalLM)
 _register_model(LoRAModelForCausalLM)
 _register_model(LoRAModelForEvaluation)
+_register_quantization_method(BitsAndBytes)
+_register_quantization_method(GPTQ)

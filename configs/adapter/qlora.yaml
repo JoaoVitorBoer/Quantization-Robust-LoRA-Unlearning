@@ -10,6 +10,14 @@ model:
     task_type: "CAUSAL_LM"
   model_handler: "LoRAModelForCausalLM"
   
+  quantization_handler: BitsAndBytes
+  quantization_config: 
+    load_in_4bit: true 
+    bnb_4bit_quant_type: "nf4"          
+    bnb_4bit_use_double_quant: true
+    bnb_4bit_compute_dtype: "bfloat16" 
+
+  
 trainer:
   args:
     per_device_train_batch_size: 4

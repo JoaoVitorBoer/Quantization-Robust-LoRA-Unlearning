@@ -8,7 +8,7 @@ defaults:
   - hydra: default
   - paths: default
   - experiment: null
-  - quantization
+  - quantization: null
   - adapter: null
 
 mode: train
