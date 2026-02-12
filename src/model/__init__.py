@@ -56,9 +56,13 @@ def get_model(model_cfg: DictConfig):
     torch_dtype = get_dtype(model_args)
     model_handler = model_cfg.get("model_handler", "AutoModelForCausalLM")
     model_cls = MODEL_REGISTRY[model_handler]
+    
+    lora_config = model_cfg.get("lora_config", None)
 
     with open_dict(model_args):
         model_path = model_args.pop("pretrained_model_name_or_path", None)
+        if lora_config is not None:
+            model_args["lora_config"] = lora_config
     try:
         model = model_cls.from_pretrained(
             pretrained_model_name_or_path=model_path,
@@ -66,7 +70,6 @@ def get_model(model_cfg: DictConfig):
             **model_args,
             cache_dir=hf_home,
             quantization_config=get_quantization_config(model_cfg), # Optinal
-            lora_config=model_cfg.get("lora_config", None), # Optional
         )
 
     except Exception as e:
