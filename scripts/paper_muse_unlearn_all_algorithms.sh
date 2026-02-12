@@ -21,7 +21,12 @@ print(s.getsockname()[1])
 s.close()
 PY
 )
-echo "Master Port: ${MASTER_PORT}"
+
+RED='\e[31m'
+YELLOW='\e[33m'
+NC='\e[0m'
+
+echo -e "${YELLOW}Master Port: ${MASTER_PORT}${NC}"
 
 MODEL="Llama-2-7b-hf"
 
@@ -87,24 +92,24 @@ EPOCHS=(
 )
 
 if [[ "${#METHODS[@]}" -ne 6 ]]; then
-  echo "Expected exactly 6 methods." >&2
+  echo -e "${RED}Expected exactly 6 methods.${NC}" >&2
   exit 1
 fi
 
 if [[ "${#ALPHAS[@]}" -ne "${#METHODS[@]}" ]]; then
-  echo "ALPHAS length (${#ALPHAS[@]}) must match METHODS length (${#METHODS[@]})." >&2
+  echo -e "${RED}ALPHAS length (${#ALPHAS[@]}) must match METHODS length (${#METHODS[@]}).${NC}" >&2
   exit 1
 fi
 
 if [[ "${#EPOCHS[@]}" -ne "${#METHODS[@]}" ]]; then
-  echo "EPOCHS length (${#EPOCHS[@]}) must match METHODS length (${#METHODS[@]})." >&2
+  echo -e "${RED}EPOCHS length (${#EPOCHS[@]}) must match METHODS length (${#METHODS[@]}).${NC}" >&2
   exit 1
 fi
 
 for data_split in "${DATA_SPLITS[@]}"; do
   retain_logs_path="saves/eval/muse_${MODEL}_${data_split}_retrain/MUSE_EVAL.json"
-  echo "--- Data split: ${data_split} ---"
-  echo "Retain logs: ${retain_logs_path}"
+  echo -e "${RED}--- Data split: ${data_split} ---${NC}"
+  echo -e "${RED}Retain logs: ${retain_logs_path}${NC}"
 
   for idx in "${!METHODS[@]}"; do
     method="${METHODS[$idx]}"
@@ -132,8 +137,8 @@ for data_split in "${DATA_SPLITS[@]}"; do
     fi
 
     echo
-    echo "=== Method: ${method} | Trainer: ${trainer} | Alpha: ${alpha} | Epochs: ${epochs} ==="
-    echo "Train output: ${train_output_dir}"
+    echo -e "${RED}=== Method: ${method} | Trainer: ${trainer} | Alpha: ${alpha} | Epochs: ${epochs} ===${NC}"
+    echo -e "${RED}Train output: ${train_output_dir}${NC}"
 
     CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch \
       --config_file configs/accelerate/default_config.yaml \
