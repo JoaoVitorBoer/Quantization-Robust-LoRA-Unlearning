@@ -139,7 +139,7 @@ for data_split in "${DATA_SPLITS[@]}"; do
 
     method_slug="${method//+/_}"
     task_name="muse_${MODEL}_${data_split}_${method_slug}_alpha-${alpha}_lr-${LEARNING_RATE}_ep-${epochs}_r-${rank}_la-${lora_alpha}"
-    train_output_dir="saves/unlearn/norm_calculation/${method_slug}/${data_split}"
+    train_output_dir="saves/unlearn/norm_calculation/lora/${method_slug}/${data_split}"
 
     method_args=(
       "trainer.method_args.alpha=${alpha}"
