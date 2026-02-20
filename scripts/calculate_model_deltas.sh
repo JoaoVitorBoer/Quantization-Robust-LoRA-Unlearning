@@ -1,5 +1,14 @@
 #!/bin/bash
 
+#SBATCH --output=/home/joaoabitante/Sout/%j__%x.out
+#SBATCH --error=/home/joaoabitante/Sout/%j__%x.out
+
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=30
+#SBATCH --mem=52G
+#SBATCH --time=2-00:00:00
+#SBATCH --gpus=2
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
