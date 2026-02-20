@@ -12,7 +12,36 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+find_repo_dir() {
+  local candidate=""
+
+  # Best signal when running with sbatch: original submission directory.
+  if [[ -n "${SLURM_SUBMIT_DIR:-}" ]]; then
+    candidate="${SLURM_SUBMIT_DIR}"
+    if [[ -f "${candidate}/calculate_model_deltas.py" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  fi
+
+  # Common local execution paths.
+  for candidate in "${PWD}" "${SCRIPT_DIR}" "${SCRIPT_DIR}/.."; do
+    if [[ -f "${candidate}/calculate_model_deltas.py" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+if ! REPO_DIR="$(find_repo_dir)"; then
+  echo "Error: could not locate repository root containing calculate_model_deltas.py." >&2
+  echo "Hint: run from repo root, or submit with sbatch from repo root so SLURM_SUBMIT_DIR is set." >&2
+  exit 1
+fi
+
 cd "${REPO_DIR}"
 
 if command -v python3 >/dev/null 2>&1; then
@@ -26,13 +55,13 @@ fi
 
 ROOT_DIR="${ROOT_DIR:-saves/unlearn/norm_calculation}"
 OUTPUT_CSV="${OUTPUT_CSV:-${ROOT_DIR}/delta_frobenius_norms.csv}"
-DTYPE="${DTYPE:-float16}"
+DTYPE="${DTYPE:-float32}"
 CACHE_DIR="${CACHE_DIR:-}"
 TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 FAIL_FAST="${FAIL_FAST:-false}"
 
 cmd=(
-  "${PYTHON_BIN}" "calculate_model_deltas.py"
+  "${PYTHON_BIN}" "${REPO_DIR}/calculate_model_deltas.py"
   "--root-dir" "${ROOT_DIR}"
   "--output-csv" "${OUTPUT_CSV}"
   "--dtype" "${DTYPE}"
