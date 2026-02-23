@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import gc
 import re
@@ -56,6 +57,16 @@ def parse_args() -> argparse.Namespace:
         help="Optional Hugging Face cache dir.",
     )
     parser.add_argument(
+        "--target-layers",
+        type=str,
+        default=None,
+        help=(
+            "Optional module-name filter for delta calculation. Accepts either a comma-separated "
+            "string (e.g. q_proj,v_proj) or a Python/JSON-like list string "
+            "(e.g. [\"q_proj\", \"v_proj\"])."
+        ),
+    )
+    parser.add_argument(
         "--trust-remote-code",
         action="store_true",
         help="Pass trust_remote_code=True when loading models.",
@@ -74,6 +85,43 @@ def dtype_from_str(dtype_name: str):
     if dtype_name == "bfloat16":
         return torch.bfloat16
     return torch.float32
+
+
+def parse_target_layers(raw_layers: Optional[str]) -> Optional[List[str]]:
+    if raw_layers is None:
+        return None
+
+    token = raw_layers.strip()
+    if not token:
+        return None
+
+    if token.startswith("["):
+        try:
+            parsed = ast.literal_eval(token)
+        except (ValueError, SyntaxError) as exc:
+            raise ValueError(
+                "Invalid --target-layers list format. Expected something like "
+                "['q_proj', 'v_proj']."
+            ) from exc
+        if not isinstance(parsed, (list, tuple)):
+            raise ValueError("Invalid --target-layers value. Expected a list of strings.")
+        raw_values = list(parsed)
+    else:
+        raw_values = token.split(",")
+
+    layers: List[str] = []
+    for value in raw_values:
+        if not isinstance(value, str):
+            raise ValueError("Invalid --target-layers value. Every entry must be a string.")
+        layer_name = value.strip()
+        if layer_name:
+            layers.append(layer_name)
+
+    if not layers:
+        raise ValueError("Invalid --target-layers value. No layer names were provided.")
+
+    # Preserve input order while removing duplicates.
+    return list(dict.fromkeys(layers))
 
 
 def canonical_split_name(raw_split: str) -> str:
@@ -165,12 +213,18 @@ def load_merged_lora_model(
     return merged_model
 
 
-def frobenius_delta_norm(base_model, loaded_model) -> float:
+def frobenius_delta_norm(
+    base_model,
+    loaded_model,
+    target_layers: Optional[List[str]] = None,
+) -> float:
     loaded_params = dict(loaded_model.named_parameters())
     base_keys = []
     loaded_keys = set(loaded_params.keys())
 
     total_sq = torch.zeros((), dtype=torch.float64)
+    matched_param_count = 0
+    target_layer_set = set(target_layers) if target_layers else None
 
     with torch.no_grad():
         for name, base_param in base_model.named_parameters():
@@ -184,6 +238,12 @@ def frobenius_delta_norm(base_model, loaded_model) -> float:
                     f"{tuple(base_param.shape)} vs {tuple(loaded_param.shape)}."
                 )
 
+            if target_layer_set is not None:
+                param_tokens = set(name.split("."))
+                if param_tokens.isdisjoint(target_layer_set):
+                    continue
+
+            matched_param_count += 1
             diff = loaded_param.detach().to(torch.float32) - base_param.detach().to(torch.float32)
             total_sq += torch.sum(diff * diff, dtype=torch.float64)
 
@@ -194,6 +254,14 @@ def frobenius_delta_norm(base_model, loaded_model) -> float:
             f"Loaded model has {len(extra)} extra parameters not in base model. "
             f"Examples: {preview}"
         )
+
+    if matched_param_count == 0:
+        if target_layers:
+            raise ValueError(
+                "No parameters matched --target-layers. "
+                f"Requested layers: {target_layers}."
+            )
+        raise ValueError("No parameters available to compute delta norm.")
 
     return float(torch.sqrt(total_sq).item())
 
@@ -236,6 +304,7 @@ def main() -> None:
     output_csv = args.output_csv.resolve() if args.output_csv else (root_dir / "delta_frobenius_norms.csv")
     output_csv = output_csv.resolve()
     dtype = dtype_from_str(args.dtype)
+    target_layers = parse_target_layers(args.target_layers)
 
     if not root_dir.exists():
         raise FileNotFoundError(f"Root directory not found: {root_dir}")
@@ -246,6 +315,10 @@ def main() -> None:
     targets.sort(key=lambda t: (t["split"], t["variant"], t["method"], t["loaded_model"]))
 
     print(f"Found {len(targets)} targets under {root_dir}")
+    if target_layers:
+        print(f"Computing deltas only for layers: {target_layers}")
+    else:
+        print("Computing deltas for all layers")
     ensure_csv_dir(output_csv)
 
     rows = []
@@ -299,7 +372,11 @@ def main() -> None:
                     dtype=dtype,
                 )
 
-            delta_norm = frobenius_delta_norm(base_model, loaded_model)
+            delta_norm = frobenius_delta_norm(
+                base_model,
+                loaded_model,
+                target_layers=target_layers,
+            )
             rows.append(
                 {
                     "variant": variant,

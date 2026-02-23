@@ -59,6 +59,7 @@ DTYPE="${DTYPE:-float32}"
 CACHE_DIR="${CACHE_DIR:-}"
 TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 FAIL_FAST="${FAIL_FAST:-false}"
+TARGET_LAYERS="${TARGET_LAYERS:-[\"q_proj\",\"v_proj\",\"k_proj\",\"o_proj\",\"gate_proj\",\"down_proj\",\"up_proj\"]}"
 
 cmd=(
   "${PYTHON_BIN}" "${REPO_DIR}/calculate_model_deltas.py"
@@ -77,6 +78,10 @@ fi
 
 if [[ "${FAIL_FAST}" == "true" ]]; then
   cmd+=("--fail-fast")
+fi
+
+if [[ -n "${TARGET_LAYERS}" ]]; then
+  cmd+=("--target-layers" "${TARGET_LAYERS}")
 fi
 
 # Optional extra args passed directly to calculate_model_deltas.py
