@@ -226,17 +226,19 @@ def load_merged_lora_model(
     return merged_model
 
 
-def frobenius_delta_norm(
+def frobenius_delta_stats(
     base_model,
     loaded_model,
     target_layers: Optional[List[str]] = None,
-) -> float:
+) -> Dict[str, float]:
     loaded_params = dict(loaded_model.named_parameters())
     base_keys = []
     loaded_keys = set(loaded_params.keys())
 
-    total_sq = torch.zeros((), dtype=torch.float64)
+    total_delta_sq = torch.zeros((), dtype=torch.float64)
+    total_base_sq = torch.zeros((), dtype=torch.float64)
     matched_param_count = 0
+    matched_numel = 0
     target_layer_set = set(target_layers) if target_layers else None
 
     with torch.no_grad():
@@ -257,8 +259,12 @@ def frobenius_delta_norm(
                     continue
 
             matched_param_count += 1
-            diff = loaded_param.detach().to(torch.float32) - base_param.detach().to(torch.float32)
-            total_sq += torch.sum(diff * diff, dtype=torch.float64)
+            base_fp32 = base_param.detach().to(torch.float32)
+            loaded_fp32 = loaded_param.detach().to(torch.float32)
+            diff = loaded_fp32 - base_fp32
+            total_delta_sq += torch.sum(diff * diff, dtype=torch.float64)
+            total_base_sq += torch.sum(base_fp32 * base_fp32, dtype=torch.float64)
+            matched_numel += base_param.numel()
 
     extra = loaded_keys - set(base_keys)
     if extra:
@@ -276,7 +282,24 @@ def frobenius_delta_norm(
             )
         raise ValueError("No parameters available to compute delta norm.")
 
-    return float(torch.sqrt(total_sq).item())
+    if matched_numel <= 0:
+        raise ValueError("No tensor elements available to compute delta statistics.")
+
+    delta_l2_frobenius = float(torch.sqrt(total_delta_sq).item())
+    base_l2_frobenius = float(torch.sqrt(total_base_sq).item())
+    delta_rms = float(torch.sqrt(total_delta_sq / matched_numel).item())
+    delta_over_base_l2 = (
+        delta_l2_frobenius / base_l2_frobenius if base_l2_frobenius > 0.0 else float("nan")
+    )
+
+    return {
+        "delta_l2_frobenius": delta_l2_frobenius,
+        "base_l2_frobenius": base_l2_frobenius,
+        "delta_rms": delta_rms,
+        "delta_over_base_l2": delta_over_base_l2,
+        "matched_param_count": float(matched_param_count),
+        "matched_numel": float(matched_numel),
+    }
 
 
 def infer_layer_names(base_model) -> List[str]:
@@ -425,7 +448,7 @@ def main() -> None:
 
             for layer_name in layers_to_compute:
                 print(f"  [debug] Calculating layer: {layer_name}")
-                layer_delta_norm = frobenius_delta_norm(
+                layer_stats = frobenius_delta_stats(
                     base_model,
                     loaded_model,
                     target_layers=[layer_name],
@@ -438,10 +461,20 @@ def main() -> None:
                         "base_model": base_model_ref,
                         "loaded_model": loaded_model_ref,
                         "layer": layer_name,
-                        "delta_l2_frobenius": f"{layer_delta_norm:.10f}",
+                        "delta_l2_frobenius": f"{layer_stats['delta_l2_frobenius']:.10f}",
+                        "base_l2_frobenius": f"{layer_stats['base_l2_frobenius']:.10f}",
+                        "delta_rms": f"{layer_stats['delta_rms']:.10f}",
+                        "delta_over_base_l2": f"{layer_stats['delta_over_base_l2']:.10f}",
+                        "matched_param_count": f"{int(layer_stats['matched_param_count'])}",
+                        "matched_numel": f"{int(layer_stats['matched_numel'])}",
                     }
                 )
-                print(f"    delta_l2_frobenius: {layer_delta_norm:.10f}")
+                print(
+                    "    "
+                    f"delta_l2_frobenius: {layer_stats['delta_l2_frobenius']:.10f} | "
+                    f"delta_rms: {layer_stats['delta_rms']:.10f} | "
+                    f"delta_over_base_l2: {layer_stats['delta_over_base_l2']:.10f}"
+                )
 
             del loaded_model
             gc.collect()
@@ -462,6 +495,11 @@ def main() -> None:
             "loaded_model",
             "layer",
             "delta_l2_frobenius",
+            "base_l2_frobenius",
+            "delta_rms",
+            "delta_over_base_l2",
+            "matched_param_count",
+            "matched_numel",
         ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
