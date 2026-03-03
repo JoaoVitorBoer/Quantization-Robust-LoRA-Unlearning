@@ -56,6 +56,7 @@ fi
 ROOT_DIR="${ROOT_DIR:-saves/unlearn/norm_calculation}"
 OUTPUT_CSV="${OUTPUT_CSV:-${ROOT_DIR}/delta_frobenius_norms.csv}"
 DTYPE="${DTYPE:-float32}"
+LOAD_IN_BITS="${LOAD_IN_BITS:-}"
 CACHE_DIR="${CACHE_DIR:-}"
 TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 FAIL_FAST="${FAIL_FAST:-false}"
@@ -67,6 +68,10 @@ cmd=(
   "--output-csv" "${OUTPUT_CSV}"
   "--dtype" "${DTYPE}"
 )
+
+if [[ -n "${LOAD_IN_BITS}" ]]; then
+  cmd+=("--load-in-bits" "${LOAD_IN_BITS}")
+fi
 
 if [[ -n "${CACHE_DIR}" ]]; then
   cmd+=("--cache-dir" "${CACHE_DIR}")

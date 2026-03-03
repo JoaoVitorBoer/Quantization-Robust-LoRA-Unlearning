@@ -6,11 +6,13 @@ import ast
 import csv
 import gc
 import re
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
+
 import torch
 from peft import PeftModel
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, BitsAndBytesConfig
 
 
 MODEL_MARKERS = (
@@ -51,6 +53,13 @@ def parse_args() -> argparse.Namespace:
         help="Model loading dtype.",
     )
     parser.add_argument(
+        "--load-in-bits",
+        type=int,
+        choices=[4, 8],
+        default=None,
+        help="Optional quantized loading mode. Supported values: 4 or 8.",
+    )
+    parser.add_argument(
         "--cache-dir",
         type=Path,
         default=None,
@@ -85,6 +94,22 @@ def dtype_from_str(dtype_name: str):
     if dtype_name == "bfloat16":
         return torch.bfloat16
     return torch.float32
+
+
+def quantization_config_from_bits(
+    load_in_bits: Optional[int],
+    dtype,
+) -> Optional[BitsAndBytesConfig]:
+    if load_in_bits is None:
+        return None
+    if load_in_bits == 4:
+        return BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=dtype,
+        )
+    if load_in_bits == 8:
+        return BitsAndBytesConfig(load_in_8bit=True)
+    raise ValueError(f"Unsupported --load-in-bits value: {load_in_bits}")
 
 
 def parse_target_layers(raw_layers: Optional[str]) -> Optional[List[str]]:
@@ -178,20 +203,42 @@ def resolve_model_artifact_dir(path: Path) -> Path:
 def load_hf_model(
     model_ref: str,
     dtype,
+    cache_dir: Optional[Path] = None,
+    trust_remote_code: bool = False,
+    load_in_bits: Optional[int] = None,
 ):
+    quantization_config = quantization_config_from_bits(
+        load_in_bits=load_in_bits,
+        dtype=dtype,
+    )
+
+    model_kwargs = {
+        "torch_dtype": dtype,
+        "cache_dir": str(cache_dir) if cache_dir else None,
+        "trust_remote_code": trust_remote_code,
+    }
+    if quantization_config is not None:
+        model_kwargs["quantization_config"] = quantization_config
+
     return AutoModelForCausalLM.from_pretrained(
         model_ref,
-        torch_dtype=dtype,
+        **model_kwargs,
     )
 
 
 def load_full_ft_model(
     model_dir: Path,
     dtype,
+    cache_dir: Optional[Path] = None,
+    trust_remote_code: bool = False,
+    load_in_bits: Optional[int] = None,
 ):
     return load_hf_model(
         str(model_dir),
         dtype=dtype,
+        cache_dir=cache_dir,
+        trust_remote_code=trust_remote_code,
+        load_in_bits=load_in_bits,
     )
 
 
@@ -199,10 +246,17 @@ def load_merged_lora_model(
     adapter_dir: Path,
     base_model_ref: str,
     dtype,
+    cache_dir: Optional[Path] = None,
+    trust_remote_code: bool = False,
+    load_in_bits: Optional[int] = None,
 ):
     base_model = load_hf_model(
         base_model_ref,
         dtype=dtype,
+        cache_dir=cache_dir,
+        trust_remote_code=trust_remote_code,
+        # LoRA adapters must be merged into full-precision/base weights first.
+        load_in_bits=None,
     )
     peft_model = PeftModel.from_pretrained(
         base_model,
@@ -210,7 +264,29 @@ def load_merged_lora_model(
         is_trainable=False,
     )
     merged_model = peft_model.merge_and_unload()
-    return merged_model
+    del peft_model
+    del base_model
+
+    if load_in_bits is None:
+        return merged_model
+
+    # Quantize only after the LoRA deltas are merged into base weights.
+    with tempfile.TemporaryDirectory() as tmpdir:
+        merged_model.save_pretrained(tmpdir)
+        del merged_model
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        reloaded_quantized_model = load_hf_model(
+            tmpdir,
+            dtype=dtype,
+            cache_dir=cache_dir,
+            trust_remote_code=trust_remote_code,
+            load_in_bits=load_in_bits,
+        )
+
+    return reloaded_quantized_model
 
 
 def frobenius_delta_norm(
@@ -304,6 +380,7 @@ def main() -> None:
     output_csv = args.output_csv.resolve() if args.output_csv else (root_dir / "delta_frobenius_norms.csv")
     output_csv = output_csv.resolve()
     dtype = dtype_from_str(args.dtype)
+    load_in_bits = args.load_in_bits
     target_layers = parse_target_layers(args.target_layers)
 
     if not root_dir.exists():
@@ -319,6 +396,10 @@ def main() -> None:
         print(f"Computing deltas only for layers: {target_layers}")
     else:
         print("Computing deltas for all layers")
+    if load_in_bits:
+        print(f"Loading models with BitsAndBytes quantization: {load_in_bits}-bit")
+    else:
+        print("Loading models without bitsandbytes quantization")
     ensure_csv_dir(output_csv)
 
     rows = []
@@ -348,6 +429,9 @@ def main() -> None:
                 current_base_model = load_hf_model(
                     base_model_ref,
                     dtype=dtype,
+                    cache_dir=args.cache_dir,
+                    trust_remote_code=args.trust_remote_code,
+                    load_in_bits=load_in_bits,
                 )
                 current_base_split = split
                 current_base_model_ref = base_model_ref
@@ -364,12 +448,18 @@ def main() -> None:
                 loaded_model = load_full_ft_model(
                     Path(loaded_model_ref),
                     dtype=dtype,
+                    cache_dir=args.cache_dir,
+                    trust_remote_code=args.trust_remote_code,
+                    load_in_bits=load_in_bits,
                 )
             else:
                 loaded_model = load_merged_lora_model(
                     Path(loaded_model_ref),
                     base_model_ref=base_model_ref,
                     dtype=dtype,
+                    cache_dir=args.cache_dir,
+                    trust_remote_code=args.trust_remote_code,
+                    load_in_bits=load_in_bits,
                 )
 
             delta_norm = frobenius_delta_norm(
@@ -395,7 +485,9 @@ def main() -> None:
                 torch.cuda.empty_cache()
 
         except Exception as exc:
-            raise exc
+            print(f"  Error: {exc}")
+            if args.fail_fast:
+                raise
 
     with output_csv.open("w", newline="") as f:
         fieldnames = [
