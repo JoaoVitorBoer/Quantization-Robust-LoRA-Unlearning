@@ -48,6 +48,12 @@ class MuonAdamW(Optimizer):
         for group in self.param_groups:
             muon_group_params = []
             adamw_group_params = []
+
+            if "param_names" not in group:
+                raise ValueError(
+                    "MuonAdamW requires named parameters. "
+                    "Initialize with model.named_parameters()."
+                )
             
             for p_name, p in zip(group["param_names"], group["params"]):
                 if p.ndim == 2 and not any(layer in p_name for layer in ["embed", "lm_head", "head"]):
