@@ -1,14 +1,14 @@
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
-from torch import nn
-from copy import deepcopy
 from packaging import version
-from trainer.base import FinetuneTrainer
+from torch import nn
+from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
+from transformers.trainer_pt_utils import get_parameter_names, nested_detach
 
-from transformers.trainer_pt_utils import (
-    nested_detach,
-)
+from optimizers.moun import MuonAdamW
+from trainer.base import FinetuneTrainer
 
 
 from transformers.utils import (
@@ -36,6 +36,17 @@ if is_deepspeed_available():
 
 
 class UnlearnTrainer(FinetuneTrainer):
+    def __init__(
+        self,
+        optimizer_name: Optional[str] = None,
+        optimizer_kwargs: Optional[Dict[str, Any]] = None,
+        *args,
+        **kwargs,
+    ):
+        self.optimizer_name = optimizer_name.lower() if optimizer_name else None
+        self.optimizer_kwargs = dict(optimizer_kwargs or {})
+        super().__init__(*args, **kwargs)
+
     # Adapted from Huggingface DPO Trainer: https://github.com/huggingface/accelerate/blob/739b135f8367becb67ffaada12fe76e3aa60fefd/src/accelerate/accelerator.py#L1473
     def _prepare_deepspeed(self, model):
         # Adapted from accelerate: https://github.com/huggingface/accelerate/blob/739b135f8367becb67ffaada12fe76e3aa60fefd/src/accelerate/accelerator.py#L1473
@@ -74,6 +85,71 @@ class UnlearnTrainer(FinetuneTrainer):
         model, *_ = deepspeed.initialize(model=model, config=config_kwargs)
         model.eval()
         return model
+
+    def _get_decay_parameter_names(self, model):
+        if hasattr(self, "get_decay_parameter_names"):
+            return set(self.get_decay_parameter_names(model))
+        return {
+            name
+            for name in get_parameter_names(model, ALL_LAYERNORM_LAYERS)
+            if "bias" not in name
+        }
+
+    def _get_muon_optimizer_grouped_parameters(self, model):
+        decay_parameters = self._get_decay_parameter_names(model)
+        decay_muon_weight_decay = self.optimizer_kwargs.get(
+            "muon_weight_decay", self.args.weight_decay
+        )
+        decay_adamw_weight_decay = self.optimizer_kwargs.get(
+            "adamw_weight_decay", self.args.weight_decay
+        )
+
+        decay_group = {
+            "params": [],
+            "param_names": [],
+            "muon_weight_decay": decay_muon_weight_decay,
+            "adamw_weight_decay": decay_adamw_weight_decay,
+        }
+        no_decay_group = {
+            "params": [],
+            "param_names": [],
+            "muon_weight_decay": 0.0,
+            "adamw_weight_decay": 0.0,
+        }
+
+        for name, param in model.named_parameters():
+            if not param.requires_grad:
+                continue
+
+            group = decay_group if name in decay_parameters else no_decay_group
+            group["params"].append(param)
+            group["param_names"].append(name)
+
+        grouped_parameters = [
+            group for group in (decay_group, no_decay_group) if group["params"]
+        ]
+        if not grouped_parameters:
+            raise ValueError("Muon optimizer requires at least one trainable parameter.")
+        return grouped_parameters
+
+    def create_optimizer(self):
+        if self.optimizer_name != "muon":
+            return super().create_optimizer()
+
+        if self.optimizer is None:
+            opt_model = self.model_wrapped if is_sagemaker_mp_enabled() else self.model
+            optimizer_kwargs = dict(self.optimizer_kwargs)
+            optimizer_kwargs.pop("lr", None)
+            optimizer_grouped_parameters = self._get_muon_optimizer_grouped_parameters(
+                opt_model
+            )
+            self.optimizer = MuonAdamW(
+                optimizer_grouped_parameters,
+                lr=self.args.learning_rate,
+                **optimizer_kwargs,
+            )
+
+        return self.optimizer
 
     def prediction_step(
         self,

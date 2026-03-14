@@ -2,3 +2,6 @@ defaults:
   - finetune
 
 handler: GradAscent
+method_args:
+  optimizer_name: null
+  optimizer_kwargs: {}
