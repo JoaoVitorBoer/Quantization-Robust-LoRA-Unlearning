@@ -1,5 +1,13 @@
 #!/bin/bash
 
+#SBATCH --output=/home/joaoabitante/Sout/%j__%x.out
+#SBATCH --error=/home/joaoabitante/Sout/%j__%x.out
+
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=30
+#SBATCH --mem=32G
+#SBATCH --time=2-00:00:00
+#SBATCH --gpus=2
 
 export MASTER_PORT=$(python -c "import socket; s=socket.socket(); s.bind(('', 0)); print(s.getsockname()[1]); s.close()")
 echo "Master Port: $MASTER_PORT"
@@ -43,7 +51,7 @@ for split in "${splits[@]}"; do
     for model in "${models[@]}"; do
         task_name=tofu_${model}_${forget_split}_SimNPO_Muon
         model_path=open-unlearning/tofu_${model}_full
-        train_output_dir=saves/unlearn/${task_name}
+        train_output_dir=saves/unlearn/${saves}
 
         echo ${task_name}: Unlearning ${model_path} using SimNPO with Muon
 
