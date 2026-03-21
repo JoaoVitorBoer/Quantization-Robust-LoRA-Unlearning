@@ -7,7 +7,7 @@ from torch import nn
 from transformers.pytorch_utils import ALL_LAYERNORM_LAYERS
 from transformers.trainer_pt_utils import get_parameter_names, nested_detach
 
-from optimizers.moun import MuonAdamW
+from optimizers.muon import MuonAdamW
 from trainer.base import FinetuneTrainer
 
 
