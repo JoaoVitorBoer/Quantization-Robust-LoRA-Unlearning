@@ -4,4 +4,13 @@ defaults:
 handler: GradAscent
 method_args:
   optimizer_name: null
-  optimizer_kwargs: {}
+  optimizer_kwargs:
+    muon_momentum: null
+    muon_ns_steps: null
+    muon_adjust_lr_fn: null
+    muon_lr: null
+    muon_weight_decay: null
+    adamw_lr: null
+    adamw_betas: null
+    adamw_weight_decay: null
+    adamw_eps: null

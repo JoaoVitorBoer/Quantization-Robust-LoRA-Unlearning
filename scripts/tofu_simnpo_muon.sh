@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -euo pipefail
+export HYDRA_FULL_ERROR=1
+
 #SBATCH --output=/home/joaoabitante/Sout/%j__%x.out
 #SBATCH --error=/home/joaoabitante/Sout/%j__%x.out
 
@@ -51,7 +54,7 @@ for split in "${splits[@]}"; do
     for model in "${models[@]}"; do
         task_name=tofu_${model}_${forget_split}_SimNPO_Muon
         model_path=open-unlearning/tofu_${model}_full
-        train_output_dir=saves/unlearn/${saves}
+        train_output_dir=saves/unlearn/${task_name}
 
         echo ${task_name}: Unlearning ${model_path} using SimNPO with Muon
 
@@ -84,6 +87,11 @@ for split in "${splits[@]}"; do
         trainer.method_args.optimizer_kwargs.muon_adjust_lr_fn=$muon_adjust_lr_fn \
         trainer.method_args.optimizer_kwargs.adamw_betas=${adamw_betas} \
         trainer.method_args.optimizer_kwargs.adamw_eps=$adamw_eps
+
+        # if [[ ! -f "${train_output_dir}/config.json" ]]; then
+        #     echo "Skipping eval for ${task_name}: ${train_output_dir}/config.json not found."
+        #     continue
+        # fi
 
         # Eval
         CUDA_VISIBLE_DEVICES=0 python src/eval.py \
