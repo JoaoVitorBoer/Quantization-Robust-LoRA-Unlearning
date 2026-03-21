@@ -3,8 +3,8 @@
 """Implementation of the Muon optimizer."""
 
 import math
-from collections.abc import MutableMapping
-from typing import Optional
+from collections.abc import Iterable, MutableMapping
+from typing import Any, Optional
 
 import torch
 from torch import Tensor
@@ -15,13 +15,50 @@ except ImportError:
     # PyTorch 2.4.x still exposes DTensor via the private `_tensor` namespace.
     from torch.distributed._tensor import DTensor, distribute_tensor
 
-from torch.optim.optimizer import (
-    _disable_dynamo_if_unsupported,
-    _params_doc,
-    _to_scalar,
-    Optimizer,
-    ParamsT,
-)
+from torch.optim.optimizer import Optimizer
+
+try:
+    from torch.optim.optimizer import ParamsT
+except ImportError:
+    ParamsT = (
+        Iterable[Tensor]
+        | Iterable[dict[str, Any]]
+        | Iterable[tuple[str, Tensor]]
+    )
+
+try:
+    from torch.optim.optimizer import _disable_dynamo_if_unsupported
+except ImportError:
+    _disable_dynamo_if_unsupported = None
+
+try:
+    from torch.optim.optimizer import _params_doc
+except ImportError:
+    _params_doc = (
+        "params (iterable): iterable of parameters or named_parameters to optimize "
+        "or iterable of dicts defining parameter groups. When using named_parameters, "
+        "all parameters in all groups should be named"
+    )
+
+try:
+    from torch.optim.optimizer import _to_scalar
+except ImportError:
+    _to_scalar = None
+
+
+if _disable_dynamo_if_unsupported is None:
+    def _disable_dynamo_if_unsupported(single_tensor_fn=None):
+        def wrapper(func):
+            return func
+
+        return wrapper
+
+
+if _to_scalar is None:
+    def _to_scalar(x):
+        if isinstance(x, torch.Tensor) and x.dim() != 0:
+            return x.squeeze()
+        return x
 
 
 __all__ = ["Muon"]
