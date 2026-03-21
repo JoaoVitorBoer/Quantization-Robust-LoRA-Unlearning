@@ -1,8 +1,5 @@
 #!/bin/bash
 
-set -euo pipefail
-export HYDRA_FULL_ERROR=1
-
 #SBATCH --output=/home/joaoabitante/Sout/%j__%x.out
 #SBATCH --error=/home/joaoabitante/Sout/%j__%x.out
 
@@ -11,6 +8,10 @@ export HYDRA_FULL_ERROR=1
 #SBATCH --mem=32G
 #SBATCH --time=2-00:00:00
 #SBATCH --gpus=2
+
+
+set -euo pipefail
+export HYDRA_FULL_ERROR=1
 
 export MASTER_PORT=$(python -c "import socket; s=socket.socket(); s.bind(('', 0)); print(s.getsockname()[1]); s.close()")
 echo "Master Port: $MASTER_PORT"
