@@ -8,7 +8,12 @@ from typing import Optional
 
 import torch
 from torch import Tensor
-from torch.distributed.tensor import DTensor, distribute_tensor
+
+try:
+    from torch.distributed.tensor import DTensor, distribute_tensor
+except ImportError:
+    # PyTorch 2.4.x still exposes DTensor via the private `_tensor` namespace.
+    from torch.distributed._tensor import DTensor, distribute_tensor
 
 from torch.optim.optimizer import (
     _disable_dynamo_if_unsupported,
