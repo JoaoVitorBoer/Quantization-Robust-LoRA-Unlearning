@@ -32,13 +32,13 @@ DATA_SPLITS=(
 
 # Edit this list if you only want to run a subset of methods.
 TRAINERS=(
-  "GradAscent"
-  # "GradDiff"
+  #"GradAscent"
+  "GradDiff"
   # "NPO"
   # "SimNPO"
 )
 
-PER_DEVICE_TRAIN_BATCH_SIZE=4
+PER_DEVICE_TRAIN_BATCH_SIZE=2
 GRADIENT_ACCUMULATION_STEPS=8
 
 MUON_MOMENTUM=0.95
