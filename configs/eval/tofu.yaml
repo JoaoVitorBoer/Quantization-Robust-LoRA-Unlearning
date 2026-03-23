@@ -7,7 +7,6 @@ defaults: # include all defined metrics files
     - forget_Truth_Ratio
     - forget_quality
     - model_utility # populated in the metrics key as metrics.model_utility
-    - forget_Truth_Ratio
     - retain_Truth_Ratio
     - forget_Q_A_Prob
     - forget_Q_A_ROUGE
