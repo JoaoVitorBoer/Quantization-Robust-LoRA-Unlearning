@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import torch
 from packaging import version
