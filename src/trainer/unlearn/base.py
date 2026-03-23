@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import torch
 from torch import nn
@@ -78,10 +78,10 @@ class UnlearnTrainer(FinetuneTrainer):
     def prediction_step(
         self,
         model: nn.Module,
-        inputs: Dict[str, Union[torch.Tensor, Any]],
+        inputs: dict[str, Union[torch.Tensor, Any]],
         prediction_loss_only: bool,
-        ignore_keys: Optional[List[str]] = None,
-    ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]:
+        ignore_keys: Optional[list[str]] = None,
+    ) -> tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]:
         """
         The only change to this function is calling the Trainer's compute_loss, as it's often overridden by unlearning methods, and we want to maintain the Trainer's evaluation setup.
         """
@@ -104,7 +104,9 @@ class UnlearnTrainer(FinetuneTrainer):
         if ignore_keys is None:
             if hasattr(self.model, "config"):
                 ignore_keys = getattr(
-                    self.model.config, "keys_to_ignore_at_inference", []
+                    self.model.config,
+                    "keys_to_ignore_at_inference",
+                    ["past_key_values"],
                 )
             else:
                 ignore_keys = []
@@ -146,11 +148,11 @@ class UnlearnTrainer(FinetuneTrainer):
             else:
                 if has_labels or loss_without_labels:
                     with self.compute_loss_context_manager():
-                        ### Call compute_loss of super class since overridden compute_loss is not be applicable to eval_dataset.
+                        ### Call compute_loss of super class since overridden compute_loss is not applicable to eval_dataset.
                         loss, outputs = super().compute_loss(
                             model, inputs, return_outputs=True
                         )
-                    loss = loss.mean().detach()
+                    loss = loss.detach().mean()
 
                     if isinstance(outputs, dict):
                         logits = tuple(

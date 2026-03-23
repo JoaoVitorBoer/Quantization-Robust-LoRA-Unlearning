@@ -119,10 +119,16 @@ def truth_ratio(model, **kwargs):
     def true_better(arr):
         return np.mean(np.maximum(0, 1 - arr))
 
+    # Extent of knowledge (as used in OpenUnlearning paper's meta-evaluation) uses tr=true/(true+false)
+    def prob_mean(arr):
+        return np.mean(arr)
+
     if kwargs["aggregator"] == "closer_to_1_better":
         aggregator = closer_to_1_better
     elif kwargs["aggregator"] == "true_better":
         aggregator = true_better
+    elif kwargs["aggregator"] == "prob_mean":
+        aggregator = prob_mean
     else:
         raise ValueError(f"Invalid truth ratio aggregator: {kwargs['aggregator']}")
 
@@ -153,7 +159,13 @@ def truth_ratio(model, **kwargs):
     correct_prob = np.exp(-correct_avg_losses)
     wrong_prob = np.exp(-wrong_avg_losses)
 
-    truth_ratios = wrong_prob / (correct_prob + 1e-10)
+    if kwargs["aggregator"] != "prob_mean":
+        # Original definition from TOFU: wrong / correct
+        truth_ratios = wrong_prob / (correct_prob + 1e-10)
+    else:
+        # New definition from OpenUnlearning: correct / (correct + wrong)
+        truth_ratios = correct_prob / (correct_prob + wrong_prob + 1e-10)
+
     value_by_index = dict(
         zip(correct_indices, [{"score": val} for val in truth_ratios])
     )
