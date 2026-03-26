@@ -7,6 +7,7 @@ from omegaconf import DictConfig
 from data import get_data, get_collators
 from model import get_model
 from trainer import load_trainer
+from trainer.unlearn.muon_validation import validate_muon_unlearning_run
 from evals import get_evaluators
 from trainer.utils import seed_everything
 from transformers.utils import logging as transformers_logging
@@ -118,6 +119,7 @@ def main(cfg: DictConfig):
         evaluators=evaluators,
         template_args=template_args,
     )
+    validate_muon_unlearning_run(trainer=trainer, mode=mode)
 
     if trainer_args.do_train:
         logger.info(
