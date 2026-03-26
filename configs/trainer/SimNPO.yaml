@@ -4,14 +4,21 @@ defaults:
 handler: SimNPO
 
 args:
-  num_train_epochs: 10
+  num_train_epochs: 5
 
 method_args:
   delta: 0.0 # gamma in https://github.com/OPTML-Group/Unlearn-Simple/blob/main/TOFU/config/forget.yaml
-  beta: 0.7
-  alpha: 0.1 
-  gamma: 1.0 # npo_coeff in https://github.com/OPTML-Group/Unlearn-Simple/blob/main/TOFU/config/forget.yaml
+  beta: 4.5
+  alpha: 1.0
+  gamma: 0.125 # npo_coeff in https://github.com/OPTML-Group/Unlearn-Simple/blob/main/TOFU/config/forget.yaml
   retain_loss_type: NLL
+
+# method_args:
+#   delta: 0.0 # gamma in https://github.com/OPTML-Group/Unlearn-Simple/blob/main/TOFU/config/forget.yaml
+#   beta: 3.5
+#   alpha: 0.25
+#   gamma: 1.0 # npo_coeff in https://github.com/OPTML-Group/Unlearn-Simple/blob/main/TOFU/config/forget.yaml
+#   retain_loss_type: NLL
 
 # Parameters here: https://huggingface.co/collections/OPTML-Group/simnpo-unlearned-models
 
