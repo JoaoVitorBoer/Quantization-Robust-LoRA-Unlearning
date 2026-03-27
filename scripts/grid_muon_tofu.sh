@@ -14,9 +14,6 @@ set -euo pipefail
 
 export HYDRA_FULL_ERROR=1
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-cd "${REPO_ROOT}"
 
 RED='\e[31m'
 NC='\e[0m'
@@ -25,8 +22,8 @@ NUM_GPUS=3
 CUDA_DEVICES="${CUDA_DEVICES:-0,1,2}"
 EVAL_CUDA_DEVICE="${EVAL_CUDA_DEVICE:-0}"
 
-RESULTS_ROOT="${RESULTS_ROOT:-${REPO_ROOT}/saves/unlearn/muon_results}"
-MODELS_ROOT="${MODELS_ROOT:-${REPO_ROOT}/saves/unlearn/muon_models}"
+RESULTS_ROOT="${RESULTS_ROOT:-saves/unlearn/muon_results}"
+MODELS_ROOT="${MODELS_ROOT:-saves/unlearn/muon_models}"
 
 MODELS=(
   "Llama-3.2-1B-Instruct"
@@ -87,7 +84,7 @@ for split in "${SPLITS[@]}"; do
 
   for model in "${MODELS[@]}"; do
     model_path="open-unlearning/tofu_${model}_full"
-    retain_logs_path="${REPO_ROOT}/saves/eval/tofu_${model}_${retain_split}/TOFU_EVAL.json"
+    retain_logs_path="saves/eval/tofu_${model}_${retain_split}/TOFU_EVAL.json"
 
     for method_cfg in "${METHODS[@]}"; do
       read -r method_tag trainer experiment_cfg <<< "${method_cfg}"
