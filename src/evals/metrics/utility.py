@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-from evals.metrics.utils import aggregate_to_1D
+from evals.metrics.utils import aggregate_to_1D, tensor_to_list
 from evals.metrics.base import unlearning_metric
 
 
@@ -59,7 +59,7 @@ def classifier_prob(model, **kwargs):
         with torch.no_grad():
             outputs = classifier(**inputs)
         # Convert logits to probabilities
-        scores = F.softmax(outputs.logits, dim=-1)[:, class_id].cpu().numpy().tolist()
+        scores = tensor_to_list(F.softmax(outputs.logits, dim=-1)[:, class_id])
 
         # Map predictions to labels
         for idx, prob, text in zip(batch_indices, scores, batch_texts):

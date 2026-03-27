@@ -12,6 +12,13 @@ from data.utils import IGNORE_INDEX
 import warnings
 
 
+def tensor_to_list(tensor):
+    """Convert a tensor to a Python list, upcasting bfloat16 for NumPy compatibility."""
+    if tensor.dtype == torch.bfloat16:
+        tensor = tensor.to(torch.float32)
+    return tensor.cpu().numpy().tolist()
+
+
 def dict_transpose(evals):
     """Transpose a nested dictionary structure to group statistics by item indices."""
     # evals looks like {iidx0: {idx453: {prob: 0.1, loss: 1}},
@@ -95,8 +102,8 @@ def evaluate_probability(model, batch):
     avg_losses = losses / num_token_gt
     normalized_probs = torch.exp(-avg_losses)
 
-    avg_losses = avg_losses.cpu().numpy().tolist()
-    normalized_probs = normalized_probs.cpu().numpy().tolist()
+    avg_losses = tensor_to_list(avg_losses)
+    normalized_probs = tensor_to_list(normalized_probs)
     return [
         {"prob": prob, "avg_loss": avg_loss}
         for prob, avg_loss in zip(normalized_probs, avg_losses)
