@@ -15,6 +15,65 @@ logger = logging.getLogger(__name__)
 logging.getLogger("deepspeed").setLevel(logging.ERROR)
 
 
+def _patch_ddp_reducer_signature_compat():
+    """
+    Work around environments where the Python DDP helper calls an older Reducer
+    signature but the linked C++ extension expects the newer constructor.
+    """
+    try:
+        import torch.distributed as dist
+        import torch.nn.parallel.distributed as ddp_distributed
+        from torch.distributed import distributed_c10d
+    except Exception:
+        return
+
+    original_reducer = getattr(dist, "Reducer", None)
+    if original_reducer is None or getattr(original_reducer, "_ou_signature_patch", False):
+        return
+
+    default_first_bucket_bytes = getattr(
+        dist, "_DEFAULT_FIRST_BUCKET_BYTES", 1024 * 1024
+    )
+
+    def _compatible_reducer(*args, **kwargs):
+        try:
+            return original_reducer(*args, **kwargs)
+        except TypeError as exc:
+            # Mixed torch installs can expose an older Python-side DDP helper
+            # with a newer C++ Reducer signature requiring bucket size limits.
+            if kwargs or len(args) != 8 or "per_bucket_size_limits" not in str(exc):
+                raise
+
+            (
+                params,
+                bucket_indices,
+                process_group,
+                expect_sparse_gradients,
+                bucket_bytes_cap,
+                find_unused_parameters,
+                gradient_as_bucket_view,
+                param_to_name_mapping,
+            ) = args
+
+            return original_reducer(
+                params,
+                bucket_indices,
+                [default_first_bucket_bytes, bucket_bytes_cap],
+                process_group,
+                expect_sparse_gradients,
+                bucket_bytes_cap,
+                find_unused_parameters,
+                gradient_as_bucket_view,
+                param_to_name_mapping,
+                default_first_bucket_bytes,
+            )
+
+    _compatible_reducer._ou_signature_patch = True
+    dist.Reducer = _compatible_reducer
+    distributed_c10d.Reducer = _compatible_reducer
+    ddp_distributed.dist.Reducer = _compatible_reducer
+
+
 def _silence_non_main_process():
     """
     Prevent non-zero local ranks from spamming stdout/stderr.
@@ -42,6 +101,7 @@ def main(cfg: DictConfig):
     Args:
         cfg (DictConfig): Config to train
     """
+    _patch_ddp_reducer_signature_compat()
     _silence_non_main_process()
     seed_everything(cfg.trainer.args.seed)
     mode = cfg.get("mode", "train")
