@@ -101,7 +101,7 @@ for split in "${SPLITS[@]}"; do
         echo -e "${RED}Train output: ${train_output_dir}${NC}"
 
         CUDA_VISIBLE_DEVICES="${CUDA_DEVICES}" accelerate launch \
-          --config_file configs/accelerate/default_config.yaml \
+          --config_file configs/accelerate/no_deepspeed_config.yaml \
           --num_processes="${NUM_GPUS}" \
           --main_process_port "${MASTER_PORT}" \
           src/train.py --config-name=unlearn.yaml \
@@ -124,6 +124,7 @@ for split in "${SPLITS[@]}"; do
           trainer.args.eval_strategy=no \
           trainer.args.eval_on_start=False \
           trainer.args.do_eval=False \
+          trainer.args.deepspeed=null \
           trainer.method_args.optimizer_name=muon \
           trainer.method_args.optimizer_kwargs.muon_momentum="${MUON_MOMENTUM}" \
           trainer.method_args.optimizer_kwargs.muon_ns_steps="${MUON_NS_STEPS}" \
