@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
-#SBATCH --mem=48G
+#SBATCH --mem=10GB
 #SBATCH --time=2-00:00:00
 #SBATCH --gpus=2
 
@@ -33,13 +33,13 @@ MODELS=(
 # Format: "method_tag trainer experiment_cfg"
 # Comment out entries here to run a subset of methods.
 METHODS=(
-  "GA GradAscent unlearn/tofu/default.yaml"
-  "GradDiff GradDiff unlearn/tofu/default.yaml"
-  "NPO NPO unlearn/tofu/default.yaml"
+  #"GA GradAscent unlearn/tofu/default.yaml"
+  #"GradDiff GradDiff unlearn/tofu/default.yaml"
+  #"NPO NPO unlearn/tofu/default.yaml"
   "SimNPO SimNPO unlearn/tofu/default.yaml"
 )
 
-LRS=(5e-6 1e-5 2e-5)
+LRS=(1e-5 2e-5 5e-5)
 EPOCHS=(5 10)
 
 SPLITS=(
