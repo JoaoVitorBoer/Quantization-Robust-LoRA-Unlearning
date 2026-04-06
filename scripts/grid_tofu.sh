@@ -27,7 +27,7 @@ MODELS_ROOT="${MODELS_ROOT:-saves/unlearn/adam_models}"
 MODELS=(
   "Llama-3.2-1B-Instruct"
   "Llama-3.2-3B-Instruct"
-  "Llama-3.1-8B-Instruct"
+  #"Llama-3.1-8B-Instruct"
 )
 
 # Format: "method_tag trainer experiment_cfg"
