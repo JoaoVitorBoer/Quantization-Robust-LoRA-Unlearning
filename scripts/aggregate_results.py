@@ -47,14 +47,15 @@ MEM_SOURCE_COLS = [
 ]
 
 # Metadata levels relative to the root (root / method / split / model / lr_folder / file)
+# lr_folder examples:  "lr-1e-5"  (Muon)  or  "lr-1e-5_ep-5"  (Adam)
 LEVELS = {
-    "method":         -5,   # e.g. SimNPO
-    "data_split":     -4,   # e.g. forget01
-    "model":          -3,   # e.g. Llama-3.2-1B-Instruct
-    "learning_rate":  -2,   # e.g. lr-1e-5  or  lr-1e-5_ep-5
+    "method":     -5,   # e.g. SimNPO
+    "data_split": -4,   # e.g. forget01
+    "model":      -3,   # e.g. Llama-3.2-1B-Instruct
+    # index -2 is the lr_folder; parsed separately into learning_rate + epochs
 }
 
-SORT_COLS = ["optimizer_type", "method", "data_split", "model", "learning_rate"]
+SORT_COLS = ["optimizer_type", "method", "data_split", "model", "learning_rate", "epochs"]
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +80,26 @@ def harmonic_mean_frame(df: pd.DataFrame) -> pd.Series:
 # Path parsing
 # ---------------------------------------------------------------------------
 
+def parse_lr_folder(lr_folder: str) -> tuple[str | None, str | None]:
+    """
+    Split a lr_folder string into (learning_rate, epochs).
+
+    Supported formats:
+        "lr-1e-5"        →  ("1e-5",  None)
+        "lr-1e-5_ep-5"   →  ("1e-5",  "5")
+    """
+    lr_value = None
+    ep_value = None
+
+    for segment in lr_folder.split("_"):
+        if segment.startswith("lr-"):
+            lr_value = segment[len("lr-"):]
+        elif segment.startswith("ep-"):
+            ep_value = segment[len("ep-"):]
+
+    return lr_value, ep_value
+
+
 def parse_metadata(json_path: Path, optimizer_type: str) -> dict:
     """
     Extract metadata from the path of a TOFU_SUMMARY.json file.
@@ -87,11 +108,15 @@ def parse_metadata(json_path: Path, optimizer_type: str) -> dict:
         index -5 → method
         index -4 → data_split
         index -3 → model
-        index -2 → learning_rate (lr_folder)
+        index -2 → lr_folder  (e.g. "lr-1e-5" or "lr-1e-5_ep-5")
         index -1 → TOFU_SUMMARY.json
+
+    The lr_folder is split into separate 'learning_rate' and 'epochs' columns.
     """
     parts = json_path.parts
     meta = {"optimizer_type": optimizer_type}
+
+    # Extract the fixed-position fields
     for field, idx in LEVELS.items():
         try:
             meta[field] = parts[idx]
@@ -100,6 +125,18 @@ def parse_metadata(json_path: Path, optimizer_type: str) -> dict:
                 f"Cannot extract '{field}' from path (not enough components): {json_path}"
             )
             meta[field] = None
+
+    # Parse the lr_folder (index -2) into learning_rate + epochs
+    try:
+        lr_folder = parts[-2]
+        lr_value, ep_value = parse_lr_folder(lr_folder)
+        meta["learning_rate"] = lr_value
+        meta["epochs"] = ep_value
+    except IndexError:
+        warnings.warn(f"Cannot extract lr_folder from path: {json_path}")
+        meta["learning_rate"] = None
+        meta["epochs"] = None
+
     return meta
 
 
