@@ -141,6 +141,7 @@ class Muon(Optimizer):
         eps: float = EPS,
         ns_steps: int = DEFAULT_NS_STEPS,
         adjust_lr_fn: Optional[str] = None,
+        cpu_offload_momentum: bool = False,
     ) -> None:
         if isinstance(lr, Tensor) and lr.numel() != 1:
             raise ValueError("Tensor lr must be 1-element")
@@ -167,6 +168,7 @@ class Muon(Optimizer):
             "eps": eps,
             "ns_steps": ns_steps,
             "adjust_lr_fn": adjust_lr_fn,
+            "cpu_offload_momentum": cpu_offload_momentum,
         }
         super().__init__(params, defaults)
 
@@ -199,9 +201,10 @@ class Muon(Optimizer):
             state = self.state[p]
 
             if "momentum_buffer" not in state:
-                state["momentum_buffer"] = torch.zeros_like(
-                    p.grad, memory_format=torch.preserve_format
-                )
+                buf = torch.zeros_like(p.grad, memory_format=torch.preserve_format)
+                if group.get("cpu_offload_momentum", False):
+                    buf = buf.cpu()
+                state["momentum_buffer"] = buf
             muon_momentum_bufs.append(state["momentum_buffer"])
 
         return False  # has_complex
@@ -352,8 +355,15 @@ def _single_tensor_muon(
             raise ValueError("Param gradient must be a 2D matrix")
 
         buf = muon_momentum_bufs[i]
-        buf.lerp_(grad, 1 - momentum)
-        update = grad.lerp(buf, momentum) if nesterov else buf
+        if buf.device != grad.device:
+            # CPU-offloaded buffer: move to GPU, update, sync back to CPU storage
+            buf_on_device = buf.to(grad.device)
+            buf_on_device.lerp_(grad, 1 - momentum)
+            buf.copy_(buf_on_device)
+            update = grad.lerp(buf_on_device, momentum) if nesterov else buf_on_device
+        else:
+            buf.lerp_(grad, 1 - momentum)
+            update = grad.lerp(buf, momentum) if nesterov else buf
 
         if isinstance(update, DTensor):
             full_update = update.full_tensor()

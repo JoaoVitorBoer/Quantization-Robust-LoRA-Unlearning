@@ -20,6 +20,7 @@ class MuonAdamW(Optimizer):
         adamw_eps: float = 1e-8,
         muon_ns_steps: int = 5,
         muon_adjust_lr_fn: str = "match_rms_adamw",
+        cpu_offload_momentum: bool = False,
     ):
         defaults = dict(
             lr=lr,
@@ -32,6 +33,7 @@ class MuonAdamW(Optimizer):
             adamw_eps=adamw_eps,
             muon_ns_steps=muon_ns_steps,
             muon_adjust_lr_fn=muon_adjust_lr_fn,
+            cpu_offload_momentum=cpu_offload_momentum,
         )
         
         super().__init__(params, defaults)
@@ -79,6 +81,7 @@ class MuonAdamW(Optimizer):
                 "weight_decay": group.get("muon_weight_decay"),
                 "ns_steps": group.get("muon_ns_steps"),
                 "adjust_lr_fn": group.get("muon_adjust_lr_fn"),
+                "cpu_offload_momentum": group.get("cpu_offload_momentum", False),
             }
             if muon_group_params:
                 self.muon_groups.append(muon_group)
