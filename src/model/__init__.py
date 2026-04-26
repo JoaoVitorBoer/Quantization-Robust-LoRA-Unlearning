@@ -69,7 +69,7 @@ def get_model(model_cfg: DictConfig):
             torch_dtype=torch_dtype,
             **model_args,
             cache_dir=hf_home,
-            quantization_config=get_quantization_config(model_cfg), # Optinal
+            quantization_config=get_quantization_config(model_cfg), # Optional
         )
 
     except Exception as e:
@@ -122,10 +122,10 @@ def get_quantization_config(model_cfg: DictConfig):
     quant_handler = model_cfg.get("quantization_handler", None)
     if quant_handler is not None:
         quant_cls = QUANT_REGISTRY[quant_handler]
-        logger.info(
-            f"\x1b[32mLoading model with quantization config: {quant_cls}\x1b[0m"
-        )
         quant_config = model_cfg.get("quantization_config", None)
+        logger.info(
+            f"\x1b[32mLoading model with quantization config: {quant_config}\x1b[0m"
+        )
         return quant_cls.from_config(**quant_config)
     return None
 

@@ -8,6 +8,7 @@ model:
     r: 32
     bias: "none"
     task_type: "CAUSAL_LM"
+    use_rslora: false
   model_handler: "LoRAModelForCausalLM"
   
 trainer:

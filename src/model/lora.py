@@ -50,6 +50,7 @@ class LoRAModelForCausalLM:
             r=lora_config["r"],
             bias=lora_config["bias"],
             task_type=lora_config["task_type"],
+            use_rslora=lora_config.get("use_rslora", False),
         )
         logger.info(f"\x1b[32mApplying LoRA with config: {peft_config}\x1b[0m")
         model = get_peft_model(base_model, peft_config)

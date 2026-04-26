@@ -15,6 +15,7 @@ model:
 forget_split: forget10
 retain_split: retain90
 retain_logs_path: null
+holdout_split: null
 
 eval:
   tofu:

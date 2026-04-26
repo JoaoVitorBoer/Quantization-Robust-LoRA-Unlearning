@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=30G
 #SBATCH --time=2-00:00:00
-#SBATCH --gpus=4
+#SBATCH --gpus=3
 
 set -euo pipefail
 
@@ -26,16 +26,16 @@ RED='\e[31m'
 NC='\e[0m'   # no color / reset
 
 MODEL="Llama-2-7b-hf"
-DATA_SPLITS=("Books")
+DATA_SPLITS=("Books" "News")
 TRAINERS=("NPO")
 
 PER_DEVICE_TRAIN_BATCH_SIZE=2
-GRADIENT_ACCUMULATION_STEPS=2 
+GRADIENT_ACCUMULATION_STEPS=8
 LORA_DROPOUT=0.05
 
-EPOCHS=(5)
-LRS=(7e-4)
-RANKS=(32)
+EPOCHS=(5 10)
+LRS=(1e-4 7e-4)
+RANKS=(16 32 64)
 PRECISIONS=(fp 8bit 4bit)
 
 TARGET_MODULE_TAGS=(all qv proj_out)
@@ -55,8 +55,8 @@ for data_split in "${DATA_SPLITS[@]}"; do
       target_modules="${TARGET_MODULE_VALUES[$idx]}"
 
       for rank in "${RANKS[@]}"; do
-        #alphas=("${rank}" "$((rank / 2))" "$((rank * 2))")
-        alphas=("${rank}")
+        alphas=("${rank}" "$((rank / 2))" "$((rank * 2))")
+
         for alpha in "${alphas[@]}"; do
           for lr in "${LRS[@]}"; do
             for epochs in "${EPOCHS[@]}"; do
@@ -67,7 +67,7 @@ for data_split in "${DATA_SPLITS[@]}"; do
               echo -e "${RED}=== Trainer: ${trainer} | Targets: ${target_tag} | Rank: ${rank} | Alpha: ${alpha} | LR: ${lr} | Epochs: ${epochs} ===${NC}"
               echo -e "${RED}Train output: ${train_output_dir}${NC}"
 
-              CUDA_VISIBLE_DEVICES=0,1,2,3 accelerate launch --config_file configs/accelerate/default_config.yaml --num_processes=4 --main_process_port "${MASTER_PORT}" \
+              CUDA_VISIBLE_DEVICES=0,1,2 accelerate launch --config_file configs/accelerate/default_config.yaml --num_processes=3 --main_process_port "${MASTER_PORT}" \
                 src/train.py --config-name=unlearn.yaml \
                 experiment=unlearn/muse/default.yaml \
                 adapter=lora \
@@ -99,10 +99,10 @@ for data_split in "${DATA_SPLITS[@]}"; do
                     precision_tag="fp"
                     ;;
                   8bit)
-                    quant_override=("model.quantization_config=8bit")
+                    quant_override=("quantization=8bit")
                     ;;
                   4bit)
-                    quant_override=("model.quantization_config=4bit")
+                    quant_override=("quantization=4bit")
                     ;;
                   *)
                     echo -e "${RED}Unknown precision ${precision}${NC}" >&2
