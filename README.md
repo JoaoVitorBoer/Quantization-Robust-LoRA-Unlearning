@@ -61,7 +61,7 @@ Refer to `requirements.txt` for a minimal set of packages used in this repositor
 The following script runs LoRA-based unlearning for MUSE and evaluates at multiple precisions:
 
 ```bash
-bash scripts/paper_muse_unlearn_lora.sh
+bash scripts/run_muse.sh
 ```
 
 **Important:** LoRA adapters **must be merged into the base model parameters before quantization** (RTN). This ensures the unlearning updates persist after 4-bit discretization.
