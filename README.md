@@ -95,6 +95,10 @@ The following results demonstrate that **LoRA improves quantization robustness**
 
 ---
 
+## Acknowledgements
+
+This repository is built on top of [OpenUnlearning](https://github.com/open-unlearning/open-unlearning), an open-source framework for LLM unlearning. We thank them and all contributors to that project for providing a well-structured and extensible codebase that made this work possible.
+
 ## Citing this work
 
 If you use this repository in your research, please cite our paper:
@@ -118,12 +122,6 @@ If you use this repository in your research, please cite our paper:
   url     = {https://arxiv.org/abs/2506.12618}
 }
 ```
-
----
-
-## Acknowledgements
-
-This repository is built on top of [OpenUnlearning](https://github.com/open-unlearning/open-unlearning), an open-source framework for LLM unlearning. We thank them and all contributors to that project for providing a well-structured and extensible codebase that made this work possible.
 
 ---
 
