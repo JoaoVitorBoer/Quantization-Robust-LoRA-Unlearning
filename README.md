@@ -52,9 +52,15 @@ We primarily report combinations: **GA+GDR**, **GA+KLR**, **NPO+GDR**, and **NPO
 
 ### Requirements (placeholders)
 
-Install dependencies with your preferred environment manager.
+```bash
+conda create -n unlearning python=3.11
+conda activate unlearning
+pip install .[lm_eval]
+pip install --no-build-isolation flash-attn==2.6.3
 
-Refer to `requirements.txt` for a minimal set of packages used in this repository.
+# Evaluation log files (retain-model baselines used by TOFU metrics)
+python setup_data.py --eval
+```
 
 ### Example Usage
 
