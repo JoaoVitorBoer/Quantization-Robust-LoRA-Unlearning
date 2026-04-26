@@ -109,13 +109,21 @@ If you use this repository in your research, please cite our paper:
       primaryClass={cs.LG},
       url={https://arxiv.org/abs/2602.13151}, 
 }
+
+@article{openunlearning2025,
+  title   = {{OpenUnlearning}: Accelerating {LLM} Unlearning via Unified Benchmarking of Methods and Metrics},
+  author  = {Dorna, Vineeth and Mekala, Anmol and Zhao, Wenlong and McCallum, Andrew and Lipton, Zachary C and Kolter, J Zico and Maini, Pratyush},
+  journal = {arXiv preprint arXiv:2506.12618},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2506.12618}
+}
 ```
 
 ---
 
 ## Acknowledgements
 
-This repository is built on top of [OpenUnlearning](https://github.com/open-unlearning/open-unlearning), an open-source framework for LLM unlearning developed by Vineeth Dorna ([@Dornavineeth](https://github.com/Dornavineeth)) and Anmol Mekala ([@molereddy](https://github.com/molereddy)). We thank them and all contributors to that project for providing a well-structured and extensible codebase that made this work possible.
+This repository is built on top of [OpenUnlearning](https://github.com/open-unlearning/open-unlearning), an open-source framework for LLM unlearning. We thank them and all contributors to that project for providing a well-structured and extensible codebase that made this work possible.
 
 ---
 
